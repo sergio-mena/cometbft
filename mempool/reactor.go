@@ -62,6 +62,7 @@ func (memR *Reactor) GetChannels() []*p2p.ChannelDescriptor {
 		Sum: &protomem.Message_Txs{
 			Txs: &protomem.Txs{Txs: [][]byte{largestTx}},
 		},
+		// TODO: add max capacity for listo of peers
 	}
 
 	return []*p2p.ChannelDescriptor{
@@ -93,8 +94,8 @@ func (memR *Reactor) RemovePeer(peer p2p.Peer, reason interface{}) {
 func (memR *Reactor) Receive(e p2p.Envelope) {
 	memR.Logger.Debug("Receive", "src", e.Src, "chId", e.ChannelID, "msg", e.Message)
 	switch msg := e.Message.(type) {
-	case *protomem.Txs:
-		protoTxs := msg.GetTxs()
+	case *protomem.Message:
+		protoTxs := msg.GetTxs().GetTxs()
 		if len(protoTxs) == 0 {
 			memR.Logger.Error("received empty txs from peer", "src", e.Src)
 			return
@@ -102,6 +103,9 @@ func (memR *Reactor) Receive(e p2p.Envelope) {
 		txInfo := TxInfo{SenderID: memR.ids.GetForPeer(e.Src)}
 		if e.Src != nil {
 			txInfo.SenderP2PID = e.Src.ID()
+		}
+		for _, peer := range msg.GetSentTo() {
+			txInfo.sentToP2PIDs = append(txInfo.sentToP2PIDs, p2p.ID(peer))
 		}
 
 		var err error
@@ -176,10 +180,20 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 		// NOTE: Transaction batching was disabled due to
 		// https://github.com/tendermint/tendermint/issues/5796
 
-		if _, ok := memTx.senders.Load(peerID); !ok {
+		_, peer_is_sender := memTx.senders.Load(peerID)
+		_, peer_is_other := memTx.otherPeers.Load(peerID)
+
+		if !peer_is_sender && !peer_is_other {
+			peers := memR.ids.P2PIDs()
+			memR.Logger.Info("sending to peers", "peers", peers)
+			txs := &protomem.Txs{Txs: [][]byte{memTx.tx}}
+			msg := &protomem.Message{
+				Sum:    &protomem.Message_Txs{Txs: txs},
+				SentTo: memR.ids.P2PIDs(),
+			}
 			success := peer.Send(p2p.Envelope{
 				ChannelID: MempoolChannel,
-				Message:   &protomem.Txs{Txs: [][]byte{memTx.tx}},
+				Message:   msg,
 			})
 			if !success {
 				time.Sleep(PeerCatchupSleepIntervalMS * time.Millisecond)

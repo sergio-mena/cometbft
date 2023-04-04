@@ -13,7 +13,6 @@ import (
 	"github.com/cometbft/cometbft/libs/log"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
-	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/cometbft/cometbft/types"
 )
@@ -246,6 +245,9 @@ func (mem *CListMempool) CheckTx(
 		if e, ok := mem.txsMap.Load(tx.Key()); ok {
 			memTx := e.(*clist.CElement).Value.(*mempoolTx)
 			memTx.senders.LoadOrStore(txInfo.SenderID, true)
+			for _, id := range txInfo.sentToP2PIDs {
+				memTx.otherPeers.Store(id, true)
+			}
 			// TODO: consider punishing peer for dups,
 			// its non-trivial since invalid txs can become valid,
 			// but they can spam the same tx with little cost to them atm.
@@ -257,7 +259,7 @@ func (mem *CListMempool) CheckTx(
 	if err != nil {
 		return err
 	}
-	reqRes.SetCallback(mem.reqResCb(tx, txInfo.SenderID, txInfo.SenderP2PID, cb))
+	reqRes.SetCallback(mem.reqResCb(tx, txInfo, cb))
 
 	return nil
 }
@@ -294,8 +296,7 @@ func (mem *CListMempool) globalCb(req *abci.Request, res *abci.Response) {
 // Used in CheckTx to record PeerID who sent us the tx.
 func (mem *CListMempool) reqResCb(
 	tx []byte,
-	peerID uint16,
-	peerP2PID p2p.ID,
+	txInfo TxInfo,
 	externalCb func(*abci.ResponseCheckTx),
 ) func(res *abci.Response) {
 	return func(res *abci.Response) {
@@ -304,7 +305,7 @@ func (mem *CListMempool) reqResCb(
 			panic("recheck cursor is not nil in reqResCb")
 		}
 
-		mem.resCbFirstTime(tx, peerID, peerP2PID, res)
+		mem.resCbFirstTime(tx, txInfo, res)
 
 		// update metrics
 		mem.metrics.Size.Set(float64(mem.Size()))
@@ -373,8 +374,7 @@ func (mem *CListMempool) isFull(txSize int) error {
 // handled by the resCbRecheck callback.
 func (mem *CListMempool) resCbFirstTime(
 	tx []byte,
-	peerID uint16,
-	peerP2PID p2p.ID,
+	txInfo TxInfo,
 	res *abci.Response,
 ) {
 	switch r := res.Value.(type) {
@@ -398,7 +398,10 @@ func (mem *CListMempool) resCbFirstTime(
 				gasWanted: r.CheckTx.GasWanted,
 				tx:        tx,
 			}
-			memTx.senders.Store(peerID, true)
+			memTx.senders.Store(txInfo.SenderID, true)
+			for _, id := range txInfo.sentToP2PIDs {
+				memTx.otherPeers.Store(id, true)
+			}
 			mem.addTx(memTx)
 			mem.logger.Debug(
 				"added good transaction",
@@ -413,7 +416,7 @@ func (mem *CListMempool) resCbFirstTime(
 			mem.logger.Debug(
 				"rejected bad transaction",
 				"tx", types.Tx(tx).Hash(),
-				"peerID", peerP2PID,
+				"peerID", txInfo.SenderP2PID,
 				"res", r,
 				"err", postCheckErr,
 			)
@@ -682,6 +685,9 @@ type mempoolTx struct {
 	// ids of peers who've sent us this tx (as a map for quick lookups).
 	// senders: PeerID -> bool
 	senders sync.Map
+
+	// other peers where this tx has been sent
+	otherPeers sync.Map
 }
 
 // Height returns the height for this transaction
