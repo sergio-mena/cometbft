@@ -39,6 +39,11 @@ func (tx Tx) String() string {
 	return fmt.Sprintf("Tx{%X}", []byte(tx))
 }
 
+// KeyString returns the hex-encoded transaction key as a string.
+func (tx Tx) KeyString() string {
+	return fmt.Sprintf("TxKey{%X}", tx.Key())
+}
+
 // Txs is a slice of Tx.
 type Txs []Tx
 

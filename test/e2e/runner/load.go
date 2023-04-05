@@ -15,7 +15,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const workerPoolSize = 16
+const (
+	workerPoolSize = 16
+	loadInterval   = 1000 //in milliseconds
+)
 
 // Load generates transactions against the network until the given context is
 // canceled.
@@ -75,13 +78,13 @@ func loadGenerate(ctx context.Context, txCh chan<- types.Tx, testnet *e2e.Testne
 			close(txCh)
 			return
 		}
-		t.Reset(time.Second)
+		t.Reset(loadInterval * time.Millisecond)
 
 		// A context with a timeout is created here to time the createTxBatch
 		// function out. If createTxBatch has not completed its work by the time
 		// the next batch is set to be sent out, then the context is canceled so that
 		// the current batch is halted, allowing the next batch to begin.
-		tctx, cf := context.WithTimeout(ctx, time.Second)
+		tctx, cf := context.WithTimeout(ctx, loadInterval*time.Millisecond)
 		createTxBatch(tctx, txCh, testnet, id)
 		cf()
 	}
@@ -142,8 +145,10 @@ func loadProcess(ctx context.Context, txCh <-chan types.Tx, chSuccess chan<- str
 			}
 		}
 		if _, err = client.BroadcastTxSync(ctx, tx); err != nil {
+			logger.Error("BroadcastTxSync", "tx", tx.KeyString(), "address", n.AddressRPC(), "error", err.Error())
 			continue
 		}
+		logger.Info("BroadcastTxSync", "tx", tx.KeyString(), "address", n.AddressRPC())
 		chSuccess <- s
 	}
 }

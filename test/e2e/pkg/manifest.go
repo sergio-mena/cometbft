@@ -85,8 +85,13 @@ type Manifest struct {
 	// Currently only uncoordinated upgrade is supported
 	UpgradeVersion string `toml:"upgrade_version"`
 
-	LoadTxSizeBytes   int `toml:"load_tx_size_bytes"`
-	LoadTxBatchSize   int `toml:"load_tx_batch_size"`
+	// Number of bytes per transaction.
+	LoadTxSizeBytes int `toml:"load_tx_size_bytes"`
+
+	// Number (rate) of transactions per load.
+	LoadTxBatchSize int `toml:"load_tx_batch_size"`
+
+	// Number of connections that send transactions to the nodes.
 	LoadTxConnections int `toml:"load_tx_connections"`
 
 	// Enable or disable Prometheus metrics on all nodes.
