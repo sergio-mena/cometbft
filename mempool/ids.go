@@ -7,6 +7,8 @@ import (
 	"github.com/cometbft/cometbft/p2p"
 )
 
+const PrefixLength = 8
+
 type mempoolIDs struct {
 	mtx       cmtsync.RWMutex
 	peerMap   map[p2p.ID]uint16   // map from peer (crypto) id to an internal id
@@ -62,10 +64,10 @@ func (ids *mempoolIDs) GetForPeer(peer p2p.Peer) uint16 {
 	return ids.peerMap[peer.ID()]
 }
 
-func (ids *mempoolIDs) P2PIDs() []string {
+func (ids *mempoolIDs) P2PIDPrefixes() []string {
 	peers := []string{}
 	for id := range ids.peerMap {
-		peers = append(peers, string(id))
+		peers = append(peers, string(id[PrefixLength:]))
 	}
 	return peers
 }

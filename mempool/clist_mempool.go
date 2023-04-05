@@ -13,6 +13,7 @@ import (
 	"github.com/cometbft/cometbft/libs/log"
 	cmtmath "github.com/cometbft/cometbft/libs/math"
 	cmtsync "github.com/cometbft/cometbft/libs/sync"
+	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/proxy"
 	"github.com/cometbft/cometbft/types"
 )
@@ -245,9 +246,7 @@ func (mem *CListMempool) CheckTx(
 		if e, ok := mem.txsMap.Load(tx.Key()); ok {
 			memTx := e.(*clist.CElement).Value.(*mempoolTx)
 			memTx.senders.LoadOrStore(txInfo.SenderID, true)
-			for _, id := range txInfo.sentToP2PIDs {
-				memTx.otherPeers.Store(id, true)
-			}
+			memTx.setAsSentTo(txInfo.sentToP2PIDPrefixes)
 			// TODO: consider punishing peer for dups,
 			// its non-trivial since invalid txs can become valid,
 			// but they can spam the same tx with little cost to them atm.
@@ -399,9 +398,7 @@ func (mem *CListMempool) resCbFirstTime(
 				tx:        tx,
 			}
 			memTx.senders.Store(txInfo.SenderID, true)
-			for _, id := range txInfo.sentToP2PIDs {
-				memTx.otherPeers.Store(id, true)
-			}
+			memTx.setAsSentTo(txInfo.sentToP2PIDPrefixes)
 			mem.addTx(memTx)
 			mem.logger.Debug(
 				"added good transaction",
@@ -686,11 +683,23 @@ type mempoolTx struct {
 	// senders: PeerID -> bool
 	senders sync.Map
 
-	// other peers where this tx has been sent
-	otherPeers sync.Map
+	// set of peers (id prefixes) to which this tx has been sent
+	// sentToPeers: PeerID prefix -> bool
+	sentToPeers sync.Map
 }
 
 // Height returns the height for this transaction
 func (memTx *mempoolTx) Height() int64 {
 	return atomic.LoadInt64(&memTx.height)
+}
+
+func (memTx *mempoolTx) hasBeenSentTo(peer p2p.Peer) bool {
+	_, sent := memTx.sentToPeers.Load(peer.ID()[PrefixLength:])
+	return sent
+}
+
+func (memTx *mempoolTx) setAsSentTo(peers []p2p.ID) {
+	for _, idPrefix := range peers {
+		memTx.sentToPeers.Store(idPrefix, true)
+	}
 }
