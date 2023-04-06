@@ -52,6 +52,12 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Name:      "recheck_times",
 			Help:      "Number of times transactions are rechecked in the mempool.",
 		}, labels).With(labelsAndValues...),
+		TxReceivedMoreThanOnce: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "tx_received_more_than_once",
+			Help:      "Number of times a transaction was received more than once.",
+		}, labels).With(labelsAndValues...),
 		TimesTxsWereReceived: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
 			Namespace: namespace,
 			Subsystem: MetricsSubsystem,
@@ -60,24 +66,18 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 
 			Buckets: stdprometheus.ExponentialBuckets(1, 2, 5),
 		}, labels).With(labelsAndValues...),
-		TxReceivedMoreThanOnce: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: MetricsSubsystem,
-			Name:      "txs_received_more_than_once",
-			Help:      "",
-		}, labels).With(labelsAndValues...),
 	}
 }
 
 func NopMetrics() *Metrics {
 	return &Metrics{
-		Size:                    discard.NewGauge(),
-		TxSizeBytes:             discard.NewHistogram(),
-		FailedTxs:               discard.NewCounter(),
-		RejectedTxs:             discard.NewCounter(),
-		EvictedTxs:              discard.NewCounter(),
-		RecheckTimes:            discard.NewCounter(),
-		TimesTxsWereReceived:    discard.NewHistogram(),
+		Size:                   discard.NewGauge(),
+		TxSizeBytes:            discard.NewHistogram(),
+		FailedTxs:              discard.NewCounter(),
+		RejectedTxs:            discard.NewCounter(),
+		EvictedTxs:             discard.NewCounter(),
+		RecheckTimes:           discard.NewCounter(),
 		TxReceivedMoreThanOnce: discard.NewCounter(),
+		TimesTxsWereReceived:   discard.NewHistogram(),
 	}
 }
