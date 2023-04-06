@@ -62,7 +62,7 @@ func (memR *Reactor) GetChannels() []*p2p.ChannelDescriptor {
 		Sum: &protomem.Message_Txs{
 			Txs: &protomem.Txs{Txs: [][]byte{largestTx}},
 		},
-		// TODO: add max capacity for listo of peers
+		// TODO: add max capacity for list of peers
 	}
 
 	return []*p2p.ChannelDescriptor{

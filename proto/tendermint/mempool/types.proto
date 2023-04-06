@@ -3,8 +3,6 @@ package tendermint.mempool;
 
 option go_package = "github.com/cometbft/cometbft/proto/tendermint/mempool";
 
-// import "tendermint/p2p/types.proto";
-
 message Txs {
   repeated bytes txs = 1;
 }
@@ -14,5 +12,4 @@ message Message {
     Txs txs = 1;
   }
   repeated string sent_to = 2;
-  // repeated tendermint.p2p.NetAddress sent_to = 2;
 }
