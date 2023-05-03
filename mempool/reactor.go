@@ -104,8 +104,8 @@ func (memR *Reactor) Receive(e p2p.Envelope) {
 		if e.Src != nil {
 			txInfo.SenderP2PID = e.Src.ID()
 		}
-		for _, peer := range msg.GetSentTo() {
-			txInfo.sentToP2PIDPrefixes = append(txInfo.sentToP2PIDPrefixes, p2p.ID(peer))
+		for _, peer := range msg.GetSentPeers() {
+			txInfo.sentPeers = append(txInfo.sentPeers, p2p.ID(peer))
 		}
 
 		var err error
@@ -181,18 +181,18 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 		// https://github.com/tendermint/tendermint/issues/5796
 
 		_, peer_is_sender := memTx.senders.Load(peerID)
-		tx_has_been_sent := memTx.hasBeenSentTo(peer)
+		tx_was_sent := memTx.wasSentTo(peer)
 		if peer_is_sender {
 			memR.Logger.Info("NOT sending to", "sender", peer.ID(), "tx", memTx.tx.KeyString())
 		}
-		if tx_has_been_sent {
+		if tx_was_sent {
 			memR.Logger.Info("NOT sending to", "peer", peer.ID(), "tx", memTx.tx.KeyString())
 		}
 
-		if !peer_is_sender && !tx_has_been_sent {
+		if !peer_is_sender && !tx_was_sent {
 			peers := memR.ids.P2PIDPrefixes()
 			memR.Logger.Info("sending to peers", "peers", peers, "tx", memTx.tx.KeyString())
-			txs := &protomem.Txs{Txs: [][]byte{memTx.tx}, SentTo: peers}
+			txs := &protomem.Txs{Txs: [][]byte{memTx.tx}, SentPeers: peers}
 			msg := &protomem.Message{Sum: &protomem.Message_Txs{Txs: txs}}
 			success := peer.Send(p2p.Envelope{
 				ChannelID: MempoolChannel,
