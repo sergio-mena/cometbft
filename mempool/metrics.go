@@ -1,9 +1,6 @@
 package mempool
 
 import (
-	"sync"
-
-	"github.com/cometbft/cometbft/types"
 	"github.com/go-kit/kit/metrics"
 )
 
@@ -43,38 +40,4 @@ type Metrics struct {
 
 	// Number of times transactions are rechecked in the mempool.
 	RecheckTimes metrics.Counter
-
-	// Number of times a transaction was received more than once.
-	TxReceivedMoreThanOnce metrics.Counter
-
-	// Histogram of times a transaction was received.
-	TimesTxsWereReceived metrics.Histogram `metrics_buckettype:"exp" metrics_bucketsizes:"1,2,5"`
-	// For keeping track of the number of times each transaction in the mempool was received.
-	// map from types.TxKey prefix to uint64
-	timesTxWasReceived sync.Map
-	// For each transaction indicate whether there was a change in its timesTxWasReceived counter.
-	// map from types.TxKey prefix to bool
-	timesTxWasReceivedHasIncreased sync.Map
-}
-
-func (m *Metrics) countOneTimeTxWasReceived(tx types.TxKey) {
-	value, _ := m.timesTxWasReceived.LoadOrStore(tx, uint64(0))
-	m.timesTxWasReceived.Store(tx, value.(uint64)+1)
-	m.timesTxWasReceivedHasIncreased.Store(tx, true)
-}
-
-func (m *Metrics) resetTimesTxWasReceived(tx types.TxKey) {
-	m.timesTxWasReceived.Delete(tx)
-	m.timesTxWasReceivedHasIncreased.Delete(tx)
-}
-
-func (m *Metrics) observeTimesTxsWereReceived() {
-	m.timesTxWasReceived.Range(func(key, value interface{}) bool {
-		tx := key.(types.TxKey)
-		if valueIncreased, _ := m.timesTxWasReceivedHasIncreased.Load(tx); valueIncreased.(bool) {
-			m.TimesTxsWereReceived.Observe(float64(value.(uint64)))
-			m.timesTxWasReceivedHasIncreased.Store(tx, false)
-		}
-		return true
-	})
 }
