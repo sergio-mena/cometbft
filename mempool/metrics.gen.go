@@ -40,28 +40,37 @@ func PrometheusMetrics(namespace string, labelsAndValues ...string) *Metrics {
 			Name:      "rejected_txs",
 			Help:      "Number of rejected transactions.",
 		}, labels).With(labelsAndValues...),
-		EvictedTxs: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
-			Namespace: namespace,
-			Subsystem: MetricsSubsystem,
-			Name:      "evicted_txs",
-			Help:      "Number of evicted transactions.",
-		}, labels).With(labelsAndValues...),
 		RecheckTimes: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: MetricsSubsystem,
 			Name:      "recheck_times",
 			Help:      "Number of times transactions are rechecked in the mempool.",
 		}, labels).With(labelsAndValues...),
+		AlreadyReceivedTxs: prometheus.NewCounterFrom(stdprometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "already_received_txs",
+			Help:      "Number of times transactions were received more than once.",
+		}, labels).With(labelsAndValues...),
+		TimesTxsWereReceived: prometheus.NewHistogramFrom(stdprometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: MetricsSubsystem,
+			Name:      "times_txs_were_received",
+			Help:      "Histogram of times a transaction was received.",
+
+			Buckets: stdprometheus.ExponentialBuckets(1, 2, 5),
+		}, labels).With(labelsAndValues...),
 	}
 }
 
 func NopMetrics() *Metrics {
 	return &Metrics{
-		Size:         discard.NewGauge(),
-		TxSizeBytes:  discard.NewHistogram(),
-		FailedTxs:    discard.NewCounter(),
-		RejectedTxs:  discard.NewCounter(),
-		EvictedTxs:   discard.NewCounter(),
-		RecheckTimes: discard.NewCounter(),
+		Size:                 discard.NewGauge(),
+		TxSizeBytes:          discard.NewHistogram(),
+		FailedTxs:            discard.NewCounter(),
+		RejectedTxs:          discard.NewCounter(),
+		RecheckTimes:         discard.NewCounter(),
+		AlreadyReceivedTxs:   discard.NewCounter(),
+		TimesTxsWereReceived: discard.NewHistogram(),
 	}
 }
