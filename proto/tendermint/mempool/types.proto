@@ -5,11 +5,11 @@ option go_package = "github.com/cometbft/cometbft/proto/tendermint/mempool";
 
 message Txs {
   repeated bytes txs = 1;
+  repeated string sent_to = 2;
 }
 
 message Message {
   oneof sum {
     Txs txs = 1;
   }
-  repeated string sent_to = 2;
 }

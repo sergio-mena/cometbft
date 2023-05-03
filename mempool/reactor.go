@@ -94,8 +94,8 @@ func (memR *Reactor) RemovePeer(peer p2p.Peer, _ interface{}) {
 func (memR *Reactor) Receive(e p2p.Envelope) {
 	memR.Logger.Debug("Receive", "src", e.Src, "chId", e.ChannelID, "msg", e.Message)
 	switch msg := e.Message.(type) {
-	case *protomem.Message:
-		protoTxs := msg.GetTxs().GetTxs()
+	case *protomem.Txs:
+		protoTxs := msg.GetTxs()
 		if len(protoTxs) == 0 {
 			memR.Logger.Error("received empty txs from peer", "src", e.Src)
 			return
@@ -192,11 +192,8 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 		if !peer_is_sender && !tx_has_been_sent {
 			peers := memR.ids.P2PIDPrefixes()
 			memR.Logger.Info("sending to peers", "peers", peers, "tx", memTx.tx.KeyString())
-			txs := &protomem.Txs{Txs: [][]byte{memTx.tx}}
-			msg := &protomem.Message{
-				Sum:    &protomem.Message_Txs{Txs: txs},
-				SentTo: peers,
-			}
+			txs := &protomem.Txs{Txs: [][]byte{memTx.tx}, SentTo: peers}
+			msg := &protomem.Message{Sum: &protomem.Message_Txs{Txs: txs}}
 			success := peer.Send(p2p.Envelope{
 				ChannelID: MempoolChannel,
 				Message:   msg,
