@@ -16,5 +16,5 @@ type TxInfo struct {
 	SenderP2PID p2p.ID
 
 	// The list of peers to which the transaction was sent to.
-	sentPeers []p2p.ID
+	sentNodes []NodeIdPrefix
 }

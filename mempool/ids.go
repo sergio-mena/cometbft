@@ -7,6 +7,8 @@ import (
 	"github.com/cometbft/cometbft/p2p"
 )
 
+type NodeIdPrefix = string
+
 const PrefixLength = 8
 
 type mempoolIDs struct {
@@ -64,10 +66,10 @@ func (ids *mempoolIDs) GetForPeer(peer p2p.Peer) uint16 {
 	return ids.peerMap[peer.ID()]
 }
 
-func (ids *mempoolIDs) P2PIDPrefixes() []string {
-	peers := []string{}
+func (ids *mempoolIDs) P2PIDPrefixes() []NodeIdPrefix {
+	peers := []NodeIdPrefix{}
 	for id := range ids.peerMap {
-		peers = append(peers, string(id[PrefixLength:]))
+		peers = append(peers, NodeIdPrefix(id[PrefixLength:]))
 	}
 	return peers
 }

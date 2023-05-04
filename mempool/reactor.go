@@ -105,13 +105,12 @@ func (memR *Reactor) Receive(e p2p.Envelope) {
 			txInfo.SenderP2PID = e.Src.ID()
 		}
 		for _, peer := range msg.GetSentPeers() {
-			txInfo.sentPeers = append(txInfo.sentPeers, p2p.ID(peer))
+			txInfo.sentNodes = append(txInfo.sentNodes, NodeIdPrefix(peer))
 		}
 
-		var err error
 		for _, tx := range protoTxs {
 			ntx := types.Tx(tx)
-			err = memR.mempool.CheckTx(ntx, nil, txInfo)
+			err := memR.mempool.CheckTx(ntx, nil, txInfo)
 			if errors.Is(err, ErrTxInCache) {
 				memR.Logger.Debug("Tx already exists in cache", "tx", ntx.String())
 			} else if err != nil {
@@ -192,13 +191,17 @@ func (memR *Reactor) broadcastTxRoutine(peer p2p.Peer) {
 		if !peer_is_sender && !tx_was_sent {
 			peers := memR.ids.P2PIDPrefixes()
 			memR.Logger.Info("sending to peers", "peers", peers, "tx", memTx.tx.KeyString())
-			txs := &protomem.Txs{Txs: [][]byte{memTx.tx}, SentPeers: peers}
-			msg := &protomem.Message{Sum: &protomem.Message_Txs{Txs: txs}}
-			success := peer.Send(p2p.Envelope{
-				ChannelID: MempoolChannel,
-				Message:   msg,
-			})
-			if !success {
+			msg := &protomem.Message{
+				Sum: &protomem.Message_Txs{
+					Txs: &protomem.Txs{
+						Txs:       [][]byte{memTx.tx},
+						SentPeers: memTx.mergeWithSentNodes(peers),
+					},
+				},
+			}
+			if peer.Send(p2p.Envelope{ChannelID: MempoolChannel, Message: msg}) {
+				memTx.addToNodeSet(peers)
+			} else {
 				time.Sleep(PeerCatchupSleepIntervalMS * time.Millisecond)
 				continue
 			}

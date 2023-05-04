@@ -245,7 +245,7 @@ func (mem *CListMempool) CheckTx(
 		if e, ok := mem.txsMap.Load(tx.Key()); ok {
 			memTx := e.(*clist.CElement).Value.(*mempoolTx)
 			memTx.senders.LoadOrStore(txInfo.SenderID, true)
-			memTx.addToPeerSet(txInfo.sentPeers)
+			memTx.addToNodeSet(txInfo.sentNodes)
 			// TODO: consider punishing peer for dups,
 			// its non-trivial since invalid txs can become valid,
 			// but they can spam the same tx with little cost to them atm.
@@ -397,7 +397,7 @@ func (mem *CListMempool) resCbFirstTime(
 				tx:        tx,
 			}
 			memTx.senders.Store(txInfo.SenderID, true)
-			memTx.addToPeerSet(txInfo.sentPeers)
+			memTx.addToNodeSet(txInfo.sentNodes)
 			mem.addTx(memTx)
 			mem.logger.Debug(
 				"added good transaction",
@@ -673,6 +673,7 @@ func (mem *CListMempool) recheckTxs() {
 //--------------------------------------------------------------------------------
 
 // mempoolTx is a transaction that successfully ran
+// mempoolTx are the elements of the clist.CList struct defining the mempool
 type mempoolTx struct {
 	height    int64    // height that this tx had been validated in
 	gasWanted int64    // amount of gas this tx states it will require
@@ -682,9 +683,9 @@ type mempoolTx struct {
 	// senders: PeerID -> bool
 	senders sync.Map
 
-	// set of peers (id prefixes) to which this tx has been sent
-	// sentToPeers: PeerID prefix -> bool
-	sentToPeers sync.Map
+	// set of node ids (prefixes) to which this tx was sent (by this node or
+	// other nodes)
+	sentToNodes map[NodeIdPrefix]struct{}
 }
 
 // Height returns the height for this transaction
@@ -692,13 +693,28 @@ func (memTx *mempoolTx) Height() int64 {
 	return atomic.LoadInt64(&memTx.height)
 }
 
-func (memTx *mempoolTx) wasSentTo(peer p2p.Peer) bool {
-	_, sent := memTx.sentToPeers.Load(peer.ID()[PrefixLength:])
-	return sent
+func (memTx *mempoolTx) mergeWithSentNodes(nodes []NodeIdPrefix) []NodeIdPrefix {
+	peerSet := map[string]struct{}{}
+	for p := range memTx.sentToNodes {
+		peerSet[p] = struct{}{}
+	}
+	for _, p := range nodes {
+		peerSet[p] = struct{}{}
+	}
+	result := make([]NodeIdPrefix, len(peerSet))
+	for p := range peerSet {
+		result = append(result, p)
+	}
+	return result
 }
 
-func (memTx *mempoolTx) addToPeerSet(peers []p2p.ID) {
+func (memTx *mempoolTx) wasSentTo(peer p2p.Peer) bool {
+	_, ok := memTx.sentToNodes[NodeIdPrefix(peer.ID()[PrefixLength:])]
+	return ok
+}
+
+func (memTx *mempoolTx) addToNodeSet(peers []NodeIdPrefix) {
 	for _, idPrefix := range peers {
-		memTx.sentToPeers.Store(idPrefix, true)
+		memTx.sentToNodes[NodeIdPrefix(idPrefix)] = struct{}{}
 	}
 }
