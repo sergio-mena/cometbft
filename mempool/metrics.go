@@ -37,7 +37,7 @@ type Metrics struct {
 	// Number of times transactions are rechecked in the mempool.
 	RecheckTimes metrics.Counter
 
-	// Number of times transactions were received more than once.
+	//metrics:Number of duplicate transaction reception.
 	AlreadyReceivedTxs metrics.Counter
 
 	// Histogram of times a transaction was received.
