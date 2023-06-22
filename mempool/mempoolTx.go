@@ -4,6 +4,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/types"
 )
 
@@ -16,6 +17,10 @@ type mempoolTx struct {
 	// ids of peers who've sent us this tx (as a map for quick lookups).
 	// senders: PeerID -> bool
 	senders sync.Map
+
+	// set of node ids (prefixes) to which this tx was sent (by this node or
+	// other nodes)
+	sentToNodes map[NodeIdPrefix]struct{}
 }
 
 // Height returns the height for this transaction
@@ -31,4 +36,30 @@ func (memTx *mempoolTx) isSender(peerID uint16) bool {
 func (memTx *mempoolTx) addSender(senderID uint16) bool {
 	_, added := memTx.senders.LoadOrStore(senderID, true)
 	return added
+}
+
+func (memTx *mempoolTx) mergeWithSentNodes(nodes []NodeIdPrefix) []NodeIdPrefix {
+	peerSet := map[string]struct{}{}
+	for p := range memTx.sentToNodes {
+		peerSet[p] = struct{}{}
+	}
+	for _, p := range nodes {
+		peerSet[p] = struct{}{}
+	}
+	result := make([]NodeIdPrefix, len(peerSet))
+	for p := range peerSet {
+		result = append(result, p)
+	}
+	return result
+}
+
+func (memTx *mempoolTx) wasSentTo(peer p2p.Peer) bool {
+	_, ok := memTx.sentToNodes[NodeIdPrefix(peer.ID()[PrefixLength:])]
+	return ok
+}
+
+func (memTx *mempoolTx) addToNodeSet(peers []NodeIdPrefix) {
+	for _, idPrefix := range peers {
+		memTx.sentToNodes[NodeIdPrefix(idPrefix)] = struct{}{}
+	}
 }
