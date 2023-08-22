@@ -176,3 +176,18 @@ func (c Client) Validators(ctx context.Context, height *int64, page, perPage *in
 func (c Client) BroadcastEvidence(ctx context.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
 	return core.BroadcastEvidence(&rpctypes.Context{}, ev)
 }
+
+func (c Client) SemAddRule(ctx context.Context,
+	entityType uint,
+	value []byte,
+) (*ctypes.ResultSemAddRule, error) {
+	return core.SemAddRule(&rpctypes.Context{}, entityType, value)
+}
+
+func (c Client) SemDeleteAll(ctx context.Context) (*ctypes.ResultSemDeleteAll, error) {
+	return core.SemDeleteAll(&rpctypes.Context{})
+}
+
+func (c Client) SemStatus(ctx context.Context) (*ctypes.ResultSemStatus, error) {
+	return core.SemStatus(&rpctypes.Context{})
+}

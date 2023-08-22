@@ -82,6 +82,8 @@ tags:
     description: Evidence APIs
   - name: Unsafe
     description: Unsafe APIs
+  - name: Sem
+    description: Sem-related APIs (SEM is Selective Entity Monitoring)
 paths:
   /broadcast_tx_sync:
     get:
@@ -1090,6 +1092,88 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /sem_add_rule:
+    get:
+      summary: Add a new SEM rule
+      operationId: sem_add_rule
+      parameters:
+        - in: query
+          name: entity_type
+          required: true
+          description: type of the entity to monitor.
+          schema:
+            type: integer
+            example: 1
+        - in: query
+          name: value
+          required: true
+          description: the value to start watching.
+          schema:
+            type: string
+            example: "123"
+      tags:
+        - Sem
+      description: |
+        Add a watch rule to Semantic Entity Monitoring (SEM).
+
+        The `entity_type` field denotes which entity the RPC call refers to.
+        The `value` field is a serialized representation of the entity value.
+      responses:
+        "200":
+          description: SEM rule added.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /sem_delete_all:
+    get:
+      summary: Delete all SEM rules
+      operationId: sem_delete_all
+      tags:
+        - Sem
+      description: |
+        Delete all previously added rules to Semantic Entity Monitoring (SEM).
+      responses:
+        "200":
+          description: All SEM rules deleted.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmptyResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /sem_status:
+    get:
+      summary: Get SEM status
+      operationId: sem_status
+      tags:
+        - Sem
+        - Info
+      description: |
+        Get the status of Semantic Entity Monitoring (SEM).
+      responses:
+        "200":
+          description: SEM status.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SemStatusResponse"
+        "500":
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -1475,6 +1559,32 @@ components:
           properties:
             result:
               $ref: "#/components/schemas/BlockComplete"
+
+    SemRule:
+      type: object
+      properties:
+        entity_type:
+          type: integer
+          example: 1
+        value:
+          type: string
+          example: "abc"
+    SemStatus:
+      description: SEM Status Response
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/SemRule"
+    SemStatusResponse:
+      description: SEM Status Response
+      allOf:
+        - $ref: "#/components/schemas/JSONRPC"
+        - type: object
+          properties:
+            result:
+              $ref: "#/components/schemas/SemStatus"
 
     ################## FROM NOW ON NEEDS REFACTOR ##################
     BlockResultsResponse:

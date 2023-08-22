@@ -565,6 +565,41 @@ func (c *baseRPCClient) BroadcastEvidence(
 	return result, nil
 }
 
+func (c *baseRPCClient) SemAddRule(
+	ctx context.Context,
+	entityType uint,
+	value []byte,
+) (*ctypes.ResultSemAddRule, error) {
+	result := new(ctypes.ResultSemAddRule)
+	params := map[string]interface{}{
+		"entity_type": entityType,
+		"value":       value,
+	}
+	_, err := c.caller.Call(ctx, "sem_add_rule", params, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *baseRPCClient) SemDeleteAll(ctx context.Context) (*ctypes.ResultSemDeleteAll, error) {
+	result := new(ctypes.ResultSemDeleteAll)
+	_, err := c.caller.Call(ctx, "sem_delete_all", map[string]interface{}{}, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (c *baseRPCClient) SemStatus(ctx context.Context) (*ctypes.ResultSemStatus, error) {
+	result := new(ctypes.ResultSemStatus)
+	_, err := c.caller.Call(ctx, "sem_status", map[string]interface{}{}, result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
 //-----------------------------------------------------------------------------
 // WSEvents
 

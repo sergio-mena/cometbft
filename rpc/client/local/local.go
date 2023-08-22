@@ -299,3 +299,19 @@ func (c *Local) Unsubscribe(ctx context.Context, subscriber, query string) error
 func (c *Local) UnsubscribeAll(ctx context.Context, subscriber string) error {
 	return c.EventBus.UnsubscribeAll(ctx, subscriber)
 }
+
+func (c *Local) SemAddRule(
+	ctx context.Context,
+	entityType uint,
+	value []byte,
+) (*ctypes.ResultSemAddRule, error) {
+	return core.SemAddRule(c.ctx, entityType, value)
+}
+
+func (c *Local) SemDeleteAll(ctx context.Context) (*ctypes.ResultSemDeleteAll, error) {
+	return core.SemDeleteAll(c.ctx)
+}
+
+func (c *Local) SemStatus(ctx context.Context) (*ctypes.ResultSemStatus, error) {
+	return core.SemStatus(c.ctx)
+}

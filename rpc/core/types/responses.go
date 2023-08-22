@@ -234,6 +234,16 @@ type ResultBroadcastEvidence struct {
 	Hash []byte `json:"hash"`
 }
 
+// TODO: This type should come from backend
+type SemRule struct {
+	EntityType uint   `json:"entity_type"`
+	Value      []byte `json:"value"`
+}
+
+type ResultSemStatus struct {
+	Rules []SemRule `json:"rules"`
+}
+
 // empty results
 type (
 	ResultUnsafeFlushMempool struct{}
@@ -241,6 +251,8 @@ type (
 	ResultSubscribe          struct{}
 	ResultUnsubscribe        struct{}
 	ResultHealth             struct{}
+	ResultSemAddRule         struct{}
+	ResultSemDeleteAll       struct{}
 )
 
 // Event data from a subscription

@@ -46,6 +46,11 @@ var Routes = map[string]*rpc.RPCFunc{
 
 	// evidence API
 	"broadcast_evidence": rpc.NewRPCFunc(BroadcastEvidence, "evidence"),
+
+	// SEM (Selective Entity Monitoring) API
+	"sem_add_rule":   rpc.NewRPCFunc(SemAddRule, "entity_type,value"),
+	"sem_delete_all": rpc.NewRPCFunc(SemDeleteAll, ""),
+	"sem_status":     rpc.NewRPCFunc(SemStatus, ""),
 }
 
 // AddUnsafeRoutes adds unsafe routes.
