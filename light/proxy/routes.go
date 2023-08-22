@@ -49,7 +49,11 @@ func RPCRoutes(c *lrpc.Client) map[string]*rpcserver.RPCFunc {
 
 		// evidence API
 		"broadcast_evidence": rpcserver.NewRPCFunc(makeBroadcastEvidenceFunc(c), "evidence"),
-		//TODO: extend
+
+		// SEM (Selective Entity Monitoring) API
+		"sem_add_rule":   rpcserver.NewRPCFunc(makeSemAddRuleFunc(c), "entity_type,value"),
+		"sem_delete_all": rpcserver.NewRPCFunc(makeSemDeleteAllFunc(c), ""),
+		"sem_status":     rpcserver.NewRPCFunc(makeSemStatusFunc(c), ""),
 	}
 }
 
@@ -297,5 +301,29 @@ type rpcBroadcastEvidenceFunc func(ctx *rpctypes.Context, ev types.Evidence) (*c
 func makeBroadcastEvidenceFunc(c *lrpc.Client) rpcBroadcastEvidenceFunc {
 	return func(ctx *rpctypes.Context, ev types.Evidence) (*ctypes.ResultBroadcastEvidence, error) {
 		return c.BroadcastEvidence(ctx.Context(), ev)
+	}
+}
+
+type rpcSemAddRuleFunc func(ctx *rpctypes.Context, entityType uint, value []byte) (*ctypes.ResultSemAddRule, error)
+
+func makeSemAddRuleFunc(c *lrpc.Client) rpcSemAddRuleFunc {
+	return func(ctx *rpctypes.Context, entityType uint, value []byte) (*ctypes.ResultSemAddRule, error) {
+		return c.SemAddRule(ctx.Context(), entityType, value)
+	}
+}
+
+type rpcSemDeleteAllFunc func(ctx *rpctypes.Context) (*ctypes.ResultSemDeleteAll, error)
+
+func makeSemDeleteAllFunc(c *lrpc.Client) rpcSemDeleteAllFunc {
+	return func(ctx *rpctypes.Context) (*ctypes.ResultSemDeleteAll, error) {
+		return c.SemDeleteAll(ctx.Context())
+	}
+}
+
+type rpcSemStatusFunc func(ctx *rpctypes.Context) (*ctypes.ResultSemStatus, error)
+
+func makeSemStatusFunc(c *lrpc.Client) rpcSemStatusFunc {
+	return func(ctx *rpctypes.Context) (*ctypes.ResultSemStatus, error) {
+		return c.SemStatus(ctx.Context())
 	}
 }
