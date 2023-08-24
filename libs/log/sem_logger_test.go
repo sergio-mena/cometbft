@@ -29,6 +29,15 @@ func goActive(t *testing.T, logger log.Logger) {
 
 }
 
+func expectSemActive(t *testing.T, logger log.Logger) {
+	seml, ok := logger.(log.SemLogger)
+	require.True(t, ok, "Bad test setup. Expected a SEM logger but it isn't")
+
+	status, err := seml.Status()
+	require.NoError(t, err)
+	require.True(t, status.Active, "SEM is not active")
+}
+
 // Testing SEM logger wrapping TMLLogger
 func TestSemWithTMLogger(t *testing.T) {
 	testCases := []struct {
@@ -173,6 +182,7 @@ func TestSemWithWith(t *testing.T) {
 			}
 		})
 }
+
 func TestSemWithCtxFiltering(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -270,4 +280,85 @@ func TestSemWithCtxFiltering(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRuleUpdateOnCtxLogger(t *testing.T) {
+
+	t.Run("Rule update on context logger",
+		func(t *testing.T) {
+			var buf bytes.Buffer
+			filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf),
+				log.AllowError(),
+				log.AllowInfoWith("module", "consensus"))
+			semlogger := log.NewSEM(filtered)
+
+			// Create contextual logger from SEM logger
+			semWithCtx := semlogger.With("module", "consensus", "user", "Sam")
+
+			// Ensure original output is as expected
+			semlogger.Debug("here", "this is", "debug log")
+			semlogger.Info("here", "this is", "info log")
+			semlogger.Error("here", "this is", "error log")
+
+			want := strings.Join([]string{
+				`{"_msg":"here","level":"error","this is":"error log"}`,
+			}, "\n")
+
+			if have := strings.TrimSpace(buf.String()); want != have {
+				t.Errorf("\nwant:\n%s\nhave:\n%s", want, have)
+			}
+
+			// Check output of context logger is as expected
+			buf.Reset()
+			semWithCtx.Debug("here", "this is", "debug log")
+			semWithCtx.Info("here", "this is", "info log")
+			semWithCtx.Error("here", "this is", "error log")
+
+			want = strings.Join([]string{
+				`{"_msg":"here","level":"info","module":"consensus","this is":"info log","user":"Sam"}`,
+				`{"_msg":"here","level":"error","module":"consensus","this is":"error log","user":"Sam"}`,
+			}, "\n")
+
+			if have := strings.TrimSpace(buf.String()); want != have {
+				t.Errorf("\nwant:\n%s\nhave:\n%s", want, have)
+			}
+
+			// Add Matching rule to enable activate SEM on non-context SEM
+			goActive(t, semlogger)
+			buf.Reset()
+			expectSemActive(t, semlogger)
+			expectSemActive(t, semWithCtx)
+
+			// Ensure original output is as expected
+			semlogger.Debug("here", "this is", "debug log")
+			semlogger.Info("here", "this is", "info log")
+			semlogger.Error("here", "this is", "error log")
+
+			want = strings.Join([]string{
+				`{"_msg":"here","level":"debug","this is":"debug log"}`,
+				`{"_msg":"here","level":"info","this is":"info log"}`,
+				`{"_msg":"here","level":"error","this is":"error log"}`,
+			}, "\n")
+
+			if have := strings.TrimSpace(buf.String()); want != have {
+				t.Errorf("\nwant:\n%s\nhave:\n%s", want, have)
+			}
+
+			// Check on ctx logger
+			buf.Reset()
+			semWithCtx.Debug("here", "this is", "debug log")
+			semWithCtx.Info("here", "this is", "info log")
+			semWithCtx.Error("here", "this is", "error log")
+
+			want = strings.Join([]string{
+				`{"_msg":"here","level":"debug","module":"consensus","this is":"debug log","user":"Sam"}`,
+				`{"_msg":"here","level":"info","module":"consensus","this is":"info log","user":"Sam"}`,
+				`{"_msg":"here","level":"error","module":"consensus","this is":"error log","user":"Sam"}`,
+			}, "\n")
+
+			if have := strings.TrimSpace(buf.String()); want != have {
+				t.Errorf("\nwant:\n%s\nhave:\n%s", want, have)
+			}
+
+		})
 }

@@ -31,18 +31,43 @@ type semLogger struct {
 	enabled    bool
 }
 
+func (l *semLogger) forwarding() bool {
+	// In disabled state (no rules set up) SEM forwards all logs
+	if l.isDisabled() {
+		return true
+	}
+	active := l.isActive()
+	l.setActiveState(active)
+	return active
+}
+
+func (l *semLogger) isActive() bool {
+	for _, rules := range l.rules {
+		for _, count := range rules {
+			if count > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (l *semLogger) isDisabled() bool {
+	return len(l.rules) == 0
+}
+
 func (l *semLogger) Error(msg string, kvals ...interface{}) {
 	l.logBackend.Error(msg, kvals...)
 }
 
 func (l *semLogger) Info(msg string, kvals ...interface{}) {
-	if !l.enabled || l.active {
+	if l.forwarding() {
 		l.logBackend.Info(msg, kvals...)
 	}
 }
 
 func (l *semLogger) Debug(msg string, kvals ...interface{}) {
-	if !l.enabled || l.active {
+	if l.forwarding() {
 		l.logBackend.Debug(msg, kvals...)
 	}
 }
@@ -79,7 +104,7 @@ func (l *semLogger) DeleteAll() {
 
 func (l *semLogger) Status() (status SemStatus, err error) {
 	status = SemStatus{
-		Active: l.active,
+		Active: l.forwarding(),
 		Rules:  map[SemEntity]map[string]bool{},
 	}
 	for entity, rules := range l.rules {
