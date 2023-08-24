@@ -807,6 +807,24 @@ func (cs *State) receiveRoutine(maxSteps int) {
 func (cs *State) handleMsg(mi msgInfo) {
 	cs.mtx.Lock()
 	defer cs.mtx.Unlock()
+	if cs.ProposalBlock != nil {
+		for _, tx := range cs.ProposalBlock.Txs {
+			log.SemEntry(cs.Logger, 1, tx.Hash())
+			defer log.SemExit(cs.Logger, 1, tx.Hash())
+		}
+	}
+	if cs.LockedBlock != nil {
+		for _, tx := range cs.LockedBlock.Txs {
+			log.SemEntry(cs.Logger, 1, tx.Hash())
+			defer log.SemExit(cs.Logger, 1, tx.Hash())
+		}
+	}
+	if cs.ValidBlock != nil {
+		for _, tx := range cs.ValidBlock.Txs {
+			log.SemEntry(cs.Logger, 1, tx.Hash())
+			defer log.SemExit(cs.Logger, 1, tx.Hash())
+		}
+	}
 	var (
 		added bool
 		err   error
@@ -896,6 +914,29 @@ func (cs *State) handleMsg(mi msgInfo) {
 }
 
 func (cs *State) handleTimeout(ti timeoutInfo, rs cstypes.RoundState) {
+	// the timeout will now cause a state transition
+	cs.mtx.Lock()
+	defer cs.mtx.Unlock()
+
+	if cs.ProposalBlock != nil {
+		for _, tx := range cs.ProposalBlock.Txs {
+			log.SemEntry(cs.Logger, 1, tx.Hash())
+			defer log.SemExit(cs.Logger, 1, tx.Hash())
+		}
+	}
+	if cs.LockedBlock != nil {
+		for _, tx := range cs.LockedBlock.Txs {
+			log.SemEntry(cs.Logger, 1, tx.Hash())
+			defer log.SemExit(cs.Logger, 1, tx.Hash())
+		}
+	}
+	if cs.ValidBlock != nil {
+		for _, tx := range cs.ValidBlock.Txs {
+			log.SemEntry(cs.Logger, 1, tx.Hash())
+			defer log.SemExit(cs.Logger, 1, tx.Hash())
+		}
+	}
+
 	cs.Logger.Debug("received tock", "timeout", ti.Duration, "height", ti.Height, "round", ti.Round, "step", ti.Step)
 
 	// timeouts must be for current height, round, step
@@ -903,10 +944,6 @@ func (cs *State) handleTimeout(ti timeoutInfo, rs cstypes.RoundState) {
 		cs.Logger.Debug("ignoring tock because we are ahead", "height", rs.Height, "round", rs.Round, "step", rs.Step)
 		return
 	}
-
-	// the timeout will now cause a state transition
-	cs.mtx.Lock()
-	defer cs.mtx.Unlock()
 
 	switch ti.Step {
 	case cstypes.RoundStepNewHeight:
@@ -1142,6 +1179,11 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 		if block == nil {
 			return
 		}
+	}
+	// TODO Not needed but leave it as an example of redundant, harmless entry point
+	for _, tx := range block.Txs {
+		log.SemEntry(cs.Logger, 1, tx.Hash())
+		defer log.SemExit(cs.Logger, 1, tx.Hash())
 	}
 
 	// Flush the WAL. Otherwise, we may not recompute the same proposal to sign,
