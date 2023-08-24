@@ -301,7 +301,7 @@ func setupNode() (*config.Config, log.Logger, *p2p.NodeKey, error) {
 		return nil, nil, nil, err
 	}
 
-	nodeLogger = nodeLogger.With("module", "main")
+	nodeLogger = log.NewSemLogger(nodeLogger.With("module", "main"))
 
 	nodeKey, err := p2p.LoadOrGenNodeKey(cmtcfg.NodeKeyFile())
 	if err != nil {

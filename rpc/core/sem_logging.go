@@ -3,12 +3,10 @@ package core
 import (
 	"errors"
 
+	"github.com/tendermint/tendermint/libs/log"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	rpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
 )
-
-// TODO: This should disappear and use sem backend instead
-var rules = []ctypes.SemRule{}
 
 // SemAddRule adds a rule referring to an entity to be monitored
 // More: https://docs.cometbft.com/v0.34/rpc/#/Sem/sem_add_rule
@@ -17,19 +15,31 @@ func SemAddRule(ctx *rpctypes.Context, entityType uint, value []byte) (*ctypes.R
 		return nil, errors.New("zero value not allowed as entity type")
 	}
 
-	newRule := ctypes.SemRule{EntityType: entityType, Value: value}
-	rules = append(rules, newRule)
-
+	log.SemAddRule(env.Logger, log.SemEntity(entityType), value)
 	return &ctypes.ResultSemAddRule{}, nil
 }
 
 func SemDeleteAll(ctx *rpctypes.Context) (*ctypes.ResultSemDeleteAll, error) {
-	rules = []ctypes.SemRule{}
+	log.SemDeleteAll(env.Logger)
 	return &ctypes.ResultSemDeleteAll{}, nil
 }
 
 func SemStatus(ctx *rpctypes.Context) (*ctypes.ResultSemStatus, error) {
-	resRules := make([]ctypes.SemRule, len(rules))
-	copy(resRules, rules)
-	return &ctypes.ResultSemStatus{Rules: resRules}, nil
+
+	status, err := log.SemGetStatus(env.Logger)
+	if err != nil {
+		return nil, err
+	}
+
+	res := &ctypes.ResultSemStatus{Rules: make([]ctypes.SemRule, 0)}
+	for entityType, values := range status.Rules {
+		for entityValue, _ := range values {
+			newRule := ctypes.SemRule{
+				EntityType: uint(entityType),
+				Value:      []byte(entityValue),
+			}
+			res.Rules = append(res.Rules, newRule)
+		}
+	}
+	return res, nil
 }

@@ -1,6 +1,9 @@
 package log
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 // Selective Entity Monitor (SEM) Logger enables rule based log traces
 
@@ -263,4 +266,31 @@ func SemExit(logger Logger, entity SemEntity, val []byte) {
 		return
 	}
 	semLogger.Exit(entity, val)
+}
+
+func SemAddRule(logger Logger, entity SemEntity, val []byte) {
+	semLogger, ok := logger.(SemLogger)
+	if !ok {
+		logger.Debug("Can't use SEM logging. Not a compatible SEM logger")
+		return
+	}
+	semLogger.AddRule(entity, val)
+}
+
+func SemDeleteAll(logger Logger) {
+	semLogger, ok := logger.(SemLogger)
+	if !ok {
+		logger.Debug("Can't use SEM logging. Not a compatible SEM logger")
+		return
+	}
+	semLogger.DeleteAll()
+}
+
+func SemGetStatus(logger Logger) (SemStatus, error) {
+	semLogger, ok := logger.(SemLogger)
+	if !ok {
+		logger.Debug("Can't use SEM logging. Not a compatible SEM logger")
+		return SemStatus{}, errors.New("Not a SEM logger")
+	}
+	return semLogger.Status()
 }
