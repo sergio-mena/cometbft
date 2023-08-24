@@ -614,6 +614,21 @@ func (c *Client) UnsubscribeAllWS(ctx *rpctypes.Context) (*ctypes.ResultUnsubscr
 	return &ctypes.ResultUnsubscribe{}, nil
 }
 
+func (c *Client) SemAddRule(ctx context.Context, entityType uint, value []byte) (*ctypes.ResultSemAddRule, error) {
+	//TODO: Light client implementation has a logger, so extend light client interface to implement this function
+	return nil, errors.New("Light client does not implement SemAddRule method")
+}
+
+func (c *Client) SemDeleteAll(ctx context.Context) (*ctypes.ResultSemDeleteAll, error) {
+	//TODO: Light client implementation has a logger, so extend light client interface to implement this function
+	return nil, errors.New("Light client does not implement SemDeleteAll method")
+}
+
+func (c *Client) SemStatus(ctx context.Context) (*ctypes.ResultSemStatus, error) {
+	//TODO: Light client implementation has a logger, so extend light client interface to implement this function
+	return nil, errors.New("Light client does not implement SemStatus method")
+}
+
 // XXX: Copied from rpc/core/env.go
 const (
 	// see README

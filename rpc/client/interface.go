@@ -41,6 +41,7 @@ type Client interface {
 	StatusClient
 	EvidenceClient
 	MempoolClient
+	SemClient
 }
 
 // ABCIClient groups together the functionality that principally affects the
@@ -141,6 +142,13 @@ type MempoolClient interface {
 // behaviour.
 type EvidenceClient interface {
 	BroadcastEvidence(context.Context, types.Evidence) (*ctypes.ResultBroadcastEvidence, error)
+}
+
+// SemClient is used to manage the set of Selective Entity Monitoring (SEM) rules
+type SemClient interface {
+	SemAddRule(ctx context.Context, entityType uint, value []byte) (*ctypes.ResultSemAddRule, error)
+	SemDeleteAll(ctx context.Context) (*ctypes.ResultSemDeleteAll, error)
+	SemStatus(ctx context.Context) (*ctypes.ResultSemStatus, error)
 }
 
 // RemoteClient is a Client, which can also return the remote network address.

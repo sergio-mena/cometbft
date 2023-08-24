@@ -54,4 +54,9 @@ func AddUnsafeRoutes() {
 	Routes["dial_seeds"] = rpc.NewRPCFunc(UnsafeDialSeeds, "seeds")
 	Routes["dial_peers"] = rpc.NewRPCFunc(UnsafeDialPeers, "peers,persistent,unconditional,private")
 	Routes["unsafe_flush_mempool"] = rpc.NewRPCFunc(UnsafeFlushMempool, "")
+
+	// SEM (Selective Entity Monitoring) API
+	Routes["sem_add_rule"] = rpc.NewRPCFunc(SemAddRule, "entity_type,value")
+	Routes["sem_delete_all"] = rpc.NewRPCFunc(SemDeleteAll, "")
+	Routes["sem_status"] = rpc.NewRPCFunc(SemStatus, "")
 }
