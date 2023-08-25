@@ -86,7 +86,7 @@ var RootCmd = &cobra.Command{
 			logger = log.NewTracingLogger(logger)
 		}
 
-		logger = log.NewSEM(logger.With("module", "main"))
+		logger = log.NewSemLogger(logger.With("module", "main"))
 		return nil
 	},
 }

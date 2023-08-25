@@ -2,6 +2,7 @@ package log_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -29,13 +30,15 @@ func goActive(t *testing.T, logger log.Logger) {
 
 }
 
-func expectSemActive(t *testing.T, logger log.Logger) {
+func expectSemActive(t *testing.T, logger log.Logger, active bool) {
 	seml, ok := logger.(log.SemLogger)
 	require.True(t, ok, "Bad test setup. Expected a SEM logger but it isn't")
 
 	status, err := seml.Status()
 	require.NoError(t, err)
-	require.True(t, status.Active, "SEM is not active")
+	require.Equal(t, status.Active, active,
+		fmt.Sprintf("SEM active state mismatch expected %t, have %t",
+			active, status.Active))
 }
 
 // Testing SEM logger wrapping TMLLogger
@@ -106,7 +109,7 @@ func TestSemWithTMLogger(t *testing.T) {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			logger := log.NewSEM(tc.loggerBackend(&buf))
+			logger := log.NewSemLogger(tc.loggerBackend(&buf))
 			addRule(t, logger, log.SemAddress, "a Rule")
 			if tc.active {
 				goActive(t, logger)
@@ -130,7 +133,7 @@ func TestSemWithWith(t *testing.T) {
 			var buf bytes.Buffer
 			baselogger := log.NewTMJSONLoggerNoTS(&buf)
 			filtered := log.NewFilter(baselogger, log.AllowAll())
-			semlogger := log.NewSEM(filtered)
+			semlogger := log.NewSemLogger(filtered)
 
 			// Create contextual logger from SEM logger
 			semWithLogger := semlogger.With("module", "mymod", "user", "Sam")
@@ -223,7 +226,6 @@ func TestSemWithCtxFiltering(t *testing.T) {
 				`{"_msg":"here","level":"error","this is":"error log"}`,
 			}, "\n"),
 			strings.Join([]string{
-				`{"_msg":"here","level":"info","module":"consensus","this is":"info log"}`,
 				`{"_msg":"here","level":"error","module":"consensus","this is":"error log"}`,
 			}, "\n"),
 		},
@@ -251,7 +253,7 @@ func TestSemWithCtxFiltering(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
 			filtered := tc.loggerBackend(&buf)
-			semlogger := log.NewSEM(filtered)
+			semlogger := log.NewSemLogger(filtered)
 
 			if tc.enabled {
 				addRule(t, semlogger, log.SemAddress, "a Rule")
@@ -290,7 +292,7 @@ func TestRuleUpdateOnCtxLogger(t *testing.T) {
 			filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf),
 				log.AllowError(),
 				log.AllowInfoWith("module", "consensus"))
-			semlogger := log.NewSEM(filtered)
+			semlogger := log.NewSemLogger(filtered)
 
 			// Create contextual logger from SEM logger
 			semWithCtx := semlogger.With("module", "consensus", "user", "Sam")
@@ -326,8 +328,8 @@ func TestRuleUpdateOnCtxLogger(t *testing.T) {
 			// Add Matching rule to enable activate SEM on non-context SEM
 			goActive(t, semlogger)
 			buf.Reset()
-			expectSemActive(t, semlogger)
-			expectSemActive(t, semWithCtx)
+			expectSemActive(t, semlogger, true)
+			expectSemActive(t, semWithCtx, true)
 
 			// Ensure original output is as expected
 			semlogger.Debug("here", "this is", "debug log")
@@ -361,4 +363,22 @@ func TestRuleUpdateOnCtxLogger(t *testing.T) {
 			}
 
 		})
+}
+
+func TestRuleKeeping(t *testing.T) {
+	t.Run("Entry on unknown rule", func(t *testing.T) {
+		var buf bytes.Buffer
+		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf))
+		sem := log.NewSemLogger(filtered)
+		sem.Entry(log.SemAddress, []byte("myrule"))
+		expectSemActive(t, sem, false)
+	})
+	t.Run("Entry on unknown entity", func(t *testing.T) {
+		var buf bytes.Buffer
+		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf))
+		sem := log.NewSemLogger(filtered)
+		sem.Entry(3, []byte("myrule"))
+		expectSemActive(t, sem, false)
+	})
+
 }

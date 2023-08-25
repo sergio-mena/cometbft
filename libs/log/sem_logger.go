@@ -75,7 +75,7 @@ func (l *semLogger) Debug(msg string, kvals ...interface{}) {
 func (l *semLogger) With(keyvals ...interface{}) Logger {
 	sl := &semLogger{
 		logBackend: l.logBackend.With(keyvals...),
-		rules: l.rules
+		rules:      l.rules,
 	}
 	sl.setActiveState(l.active)
 	return sl
@@ -105,7 +105,7 @@ func (l *semLogger) DeleteAll() {
 
 func (l *semLogger) Status() (status SemStatus, err error) {
 	status = SemStatus{
-		Active: l.forwarding(),
+		Active: l.isActive(),
 		Rules:  map[SemEntity]map[string]bool{},
 	}
 	for entity, rules := range l.rules {
@@ -128,7 +128,8 @@ func (l *semLogger) setActiveState(active bool) {
 	// For Filter loggers we need to make sure that no filtering is happening underneath
 	next, isFilterLogger := l.logBackend.(*filter)
 	if isFilterLogger {
-		next.SetSemStatus(active)
+		//Filter backend needs to bypass all logs incase of SEM is enabled
+		next.SetSemStatus(!l.isDisabled())
 	}
 	l.active = active
 }
@@ -162,7 +163,12 @@ func (l *semLogger) Exit(entity SemEntity, value []byte) {
 		return
 	}
 
-	l.rules[entity][string(value)]-- //TODO log on underflow
+	if l.rules[entity][string(value)] == 0 {
+		l.Error("Inconsistent entity guard when exiting from rule ", string(value))
+	} else {
+		l.rules[entity][string(value)]--
+	}
+
 	for _, ruleset := range l.rules {
 		for _, matchCount := range ruleset {
 			if matchCount > 0 {
@@ -174,7 +180,7 @@ func (l *semLogger) Exit(entity SemEntity, value []byte) {
 	l.setActiveState(false)
 }
 
-func NewSEM(next Logger) SemLogger {
+func NewSemLogger(next Logger) SemLogger {
 	sem := &semLogger{
 		logBackend: next,
 		rules:      map[SemEntity]map[string]uint{},
