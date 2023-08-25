@@ -12,7 +12,7 @@ type SemLogger interface {
 }
 
 // type loglevel byte
-type SemEntity int
+type SemEntity uint
 
 const (
 	SemTransaction SemEntity = iota + 1
