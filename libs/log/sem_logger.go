@@ -73,9 +73,10 @@ func (l *semLogger) Debug(msg string, kvals ...interface{}) {
 }
 
 func (l *semLogger) With(keyvals ...interface{}) Logger {
-	sl := new(semLogger)
-	sl.logBackend = l.logBackend.With(keyvals...)
-	sl.rules = l.rules
+	sl := &semLogger{
+		logBackend: l.logBackend.With(keyvals...),
+		rules: l.rules
+	}
 	sl.setActiveState(l.active)
 	return sl
 }
