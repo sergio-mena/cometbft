@@ -16,8 +16,6 @@ type SemLogger interface {
 // type loglevel byte
 type SemEntity uint
 
-var semRulesLock sync.RWMutex
-
 const (
 	SemTransaction SemEntity = iota + 1
 	SemAddress
@@ -29,39 +27,11 @@ type SemStatus struct {
 }
 
 type semLogger struct {
-	logBackend Logger
-	rules      map[SemEntity]map[string]uint
-	active     bool
-	enabled    bool
-}
-
-func (l *semLogger) forwarding() bool {
-	// In disabled state (no rules set up) SEM forwards all logs
-	if l.isDisabled() {
-		return true
-	}
-	active := l.isActive()
-	l.setActiveState(active)
-	return active
-}
-
-func (l *semLogger) isActive() bool {
-	semRulesLock.RLock()
-	defer semRulesLock.RUnlock()
-	for _, rules := range l.rules {
-		for _, count := range rules {
-			if count > 0 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func (l *semLogger) isDisabled() bool {
-	semRulesLock.RLock()
-	defer semRulesLock.RUnlock()
-	return len(l.rules) == 0
+	logBackend   Logger
+	rules        map[SemEntity]map[string]uint
+	active       bool
+	enabled      bool
+	semRulesLock *sync.RWMutex
 }
 
 func (l *semLogger) Error(msg string, kvals ...interface{}) {
@@ -81,21 +51,54 @@ func (l *semLogger) Debug(msg string, kvals ...interface{}) {
 }
 
 func (l *semLogger) With(keyvals ...interface{}) Logger {
-	semRulesLock.RLock()
-	defer semRulesLock.RUnlock()
+	var sl *semLogger
+	func() {
+		l.semRulesLock.RLock()
+		defer l.semRulesLock.RUnlock()
 
-	sl := &semLogger{
-		logBackend: l.logBackend.With(keyvals...),
-		rules:      l.rules,
-	}
+		sl = &semLogger{
+			logBackend:   l.logBackend.With(keyvals...),
+			rules:        l.rules,
+			semRulesLock: l.semRulesLock,
+		}
+	}()
 
 	sl.setActiveState(l.active)
 	return sl
 }
 
+func (l *semLogger) forwarding() bool {
+	// In disabled state (no rules set up) SEM forwards all logs
+	if l.isDisabled() {
+		return true
+	}
+	active := l.isActive()
+	l.setActiveState(active)
+	return active
+}
+
+func (l *semLogger) isActive() bool {
+	l.semRulesLock.RLock()
+	defer l.semRulesLock.RUnlock()
+	for _, rules := range l.rules {
+		for _, count := range rules {
+			if count > 0 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (l *semLogger) isDisabled() bool {
+	l.semRulesLock.RLock()
+	defer l.semRulesLock.RUnlock()
+	return len(l.rules) == 0
+}
+
 func (l *semLogger) AddRule(entity SemEntity, value []byte) {
-	semRulesLock.Lock()
-	defer semRulesLock.Unlock()
+	l.semRulesLock.Lock()
+	defer l.semRulesLock.Unlock()
 
 	_, exist := l.rules[entity]
 	key := string(value)
@@ -111,14 +114,15 @@ func (l *semLogger) AddRule(entity SemEntity, value []byte) {
 }
 
 func (l *semLogger) DeleteAll() {
-	{
-		semRulesLock.Lock()
-		defer semRulesLock.Unlock()
+	func() {
+		l.semRulesLock.Lock()
+		defer l.semRulesLock.Unlock()
 
 		for rule := range l.rules {
 			delete(l.rules, rule)
 		}
-	}
+	}()
+
 	l.setEnabled(false)
 	l.setActiveState(false)
 }
@@ -128,8 +132,9 @@ func (l *semLogger) Status() (status SemStatus, err error) {
 		Active: l.isActive(),
 		Rules:  map[SemEntity]map[string]bool{},
 	}
-	semRulesLock.RLock()
-	defer semRulesLock.RUnlock()
+
+	l.semRulesLock.RLock()
+	defer l.semRulesLock.RUnlock()
 	for entity, rules := range l.rules {
 		for rule, count := range rules {
 			_, exists := status.Rules[entity]
@@ -169,51 +174,74 @@ func (l *semLogger) setEnabled(enable bool) {
 }
 
 func (l *semLogger) Entry(entity SemEntity, value []byte) {
-	semRulesLock.RLock()
-	_, exist := l.rules[entity][string(value)]
-	semRulesLock.RUnlock()
-	if !exist {
+	if !l.ruleExists(entity, value) {
 		return
 	}
 	if !l.active {
 		l.setActiveState(true)
 	}
-	semRulesLock.Lock()
-	l.rules[entity][string(value)]++
-	semRulesLock.Unlock()
+	l.ruleCountIncrease(entity, value)
+}
+
+func (l *semLogger) ruleExists(entity SemEntity, rule []byte) bool {
+	l.semRulesLock.RLock()
+	defer l.semRulesLock.RUnlock()
+	_, exist := l.rules[entity][string(rule)]
+	return exist
+}
+
+func (l *semLogger) ruleGetCount(entity SemEntity, rule []byte) (uint, bool) {
+	l.semRulesLock.RLock()
+	defer l.semRulesLock.RUnlock()
+	count, exist := l.rules[entity][string(rule)]
+	return count, exist
+
+}
+
+func (l *semLogger) ruleCountIncrease(entity SemEntity, rule []byte) uint {
+	if !l.ruleExists(entity, rule) {
+		return 0
+	}
+
+	l.semRulesLock.Lock()
+	defer l.semRulesLock.Unlock()
+	l.rules[entity][string(rule)]++
+	return l.rules[entity][string(rule)]
+}
+
+func (l *semLogger) ruleCountDecrease(entity SemEntity, rule []byte) uint {
+	if !l.ruleExists(entity, rule) {
+		return 0
+	}
+
+	l.semRulesLock.Lock()
+	defer l.semRulesLock.Unlock()
+
+	count := l.rules[entity][string(rule)]
+	if count == 0 {
+		l.Error("Inconsistent entity guard when exiting from rule ", string(rule))
+	} else {
+		l.rules[entity][string(rule)]--
+	}
+	return l.rules[entity][string(rule)]
 }
 
 func (l *semLogger) Exit(entity SemEntity, value []byte) {
-	{
-		semRulesLock.Lock()
-		defer semRulesLock.Unlock()
-		_, exist := l.rules[entity][string(value)]
-		if !exist {
-			return
-		}
-
-		if l.rules[entity][string(value)] == 0 {
-			l.Error("Inconsistent entity guard when exiting from rule ", string(value))
-		} else {
-			l.rules[entity][string(value)]--
-		}
-
-		for _, ruleset := range l.rules {
-			for _, matchCount := range ruleset {
-				if matchCount > 0 {
-					return
-				}
-
-			}
-		}
+	if !l.ruleExists(entity, value) {
+		return
 	}
-	l.setActiveState(false)
+
+	l.ruleCountDecrease(entity, value)
+	if !l.isActive() {
+		l.setActiveState(false)
+	}
 }
 
 func NewSemLogger(next Logger) SemLogger {
 	sem := &semLogger{
-		logBackend: next,
-		rules:      map[SemEntity]map[string]uint{},
+		logBackend:   next,
+		rules:        map[SemEntity]map[string]uint{},
+		semRulesLock: new(sync.RWMutex),
 	}
 	return sem
 }

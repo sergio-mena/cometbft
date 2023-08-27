@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/tendermint/tendermint/libs/log"
@@ -365,7 +367,7 @@ func TestRuleUpdateOnCtxLogger(t *testing.T) {
 		})
 }
 
-func TestRuleKeeping(t *testing.T) {
+func TestSemStates(t *testing.T) {
 	t.Run("Entry on unknown rule", func(t *testing.T) {
 		var buf bytes.Buffer
 		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf))
@@ -381,4 +383,188 @@ func TestRuleKeeping(t *testing.T) {
 		expectSemActive(t, sem, false)
 	})
 
+}
+
+func TestSemRuleManagement(t *testing.T) {
+	t.Run("Add rule", func(t *testing.T) {
+		var buf bytes.Buffer
+		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf))
+		sem := log.NewSemLogger(filtered)
+		rule := "rule1"
+		sem.AddRule(log.SemAddress, []byte(rule))
+		status, err := sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, map[log.SemEntity]map[string]bool{log.SemAddress: {rule: false}}, status.Rules)
+	})
+
+	t.Run("Delete rules", func(t *testing.T) {
+		var buf bytes.Buffer
+		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf))
+		sem := log.NewSemLogger(filtered)
+		expectedRules := map[log.SemEntity]map[string]bool{
+			log.SemAddress:     {"address rule1": false},
+			log.SemTransaction: {"transaction rule 1": false}}
+
+		//create rules
+		for entity, rules := range expectedRules {
+			for rule, _ := range rules {
+				sem.AddRule(entity, []byte(rule))
+			}
+		}
+
+		//cheeck rules
+		status, err := sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		sem.DeleteAll()
+		status, err = sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, map[log.SemEntity]map[string]bool{}, status.Rules)
+
+	})
+
+	t.Run("Rules on multi SEM loggers", func(t *testing.T) {
+		var buf bytes.Buffer
+		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf))
+		sem := log.NewSemLogger(filtered)
+		semCtx := sem.With().(log.SemLogger)
+
+		expectedRules := map[log.SemEntity]map[string]bool{
+			log.SemAddress:     {"address rule1": false},
+			log.SemTransaction: {"transaction rule 1": false}}
+
+		// create rules
+		for entity, rules := range expectedRules {
+			for rule, _ := range rules {
+				sem.AddRule(entity, []byte(rule))
+			}
+		}
+
+		// cheeck rules on initial logger
+		status, err := sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		// check rules on ctx logger
+		status, err = semCtx.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		// Add new rule ont original logger
+		entity, rule := log.SemAddress, "new address rule on orig"
+		expectedRules[entity][rule] = false
+		sem.AddRule(entity, []byte(rule))
+
+		// cheeck rules on initial logger
+		status, err = sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		// check rules on ctx logger
+		status, err = semCtx.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		// Add new rule on ctx logger
+		entity, rule = log.SemTransaction, "new transaction rule on ctx"
+		expectedRules[entity][rule] = false
+		semCtx.AddRule(entity, []byte(rule))
+
+		// cheeck rules on initial logger
+		status, err = sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		// check rules on ctx logger
+		status, err = semCtx.Status()
+		require.NoError(t, err)
+		require.Equal(t, expectedRules, status.Rules)
+
+		// Delete Rules on ctx logger
+		semCtx.DeleteAll()
+		status, err = sem.Status()
+		require.NoError(t, err)
+		require.Equal(t, map[log.SemEntity]map[string]bool{}, status.Rules)
+
+		status, err = semCtx.Status()
+		require.NoError(t, err)
+		require.Equal(t, map[log.SemEntity]map[string]bool{}, status.Rules)
+
+	})
+
+}
+
+func TestRulesConcurrency(t *testing.T) {
+
+	SemEnter := func(sem log.Logger, entity log.SemEntity, val []byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		semEntry := sem
+		valEntry := val
+		entityEntry := entity
+		sem.Info("1 Adding Sem entry")
+
+		log.SemEntry(semEntry, entityEntry, valEntry)
+		time.Sleep(time.Millisecond * 5)
+		sem.Info("1 Adding Sem exit")
+		log.SemExit(semEntry, entityEntry, valEntry)
+		time.Sleep(time.Second)
+	}
+
+	SemAddEnterExit := func(sem log.Logger, entity log.SemEntity, rule []byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		semEntry := sem
+		valEntry := rule
+		entityEntry := entity
+		seml, ok := semEntry.(log.SemLogger)
+		if !ok {
+			panic("Bad test setup. Expected a SEM logger but it isn't")
+		}
+		seml.Info("2 Adding rule")
+		seml.AddRule(log.SemTransaction, []byte(rule))
+		seml.Info("2 Sem entry")
+		log.SemEntry(semEntry, entityEntry, valEntry)
+		time.Sleep(time.Microsecond)
+		seml.Info("2 Sem exit")
+		log.SemExit(seml, entityEntry, valEntry)
+	}
+
+	SemExit := func(sem log.Logger, entity log.SemEntity, rule []byte, wg *sync.WaitGroup) {
+		defer wg.Done()
+		semEntry := sem
+		valEntry := rule
+		entityEntry := entity
+		seml, ok := semEntry.(log.SemLogger)
+		if !ok {
+			panic("Bad test setup. Expected a SEM logger but it isn't")
+		}
+		time.Sleep(time.Microsecond)
+		seml.Info("3 Sem exit")
+		log.SemExit(seml, entityEntry, valEntry)
+	}
+
+	t.Run("Concurrent update on ruleset", func(t *testing.T) {
+		var buf bytes.Buffer
+		filtered := log.NewFilter(log.NewTMJSONLoggerNoTS(&buf), log.AllowAll())
+		sem := log.NewSemLogger(filtered)
+		rule := []byte("my rule")
+		entity := log.SemAddress
+		sem.AddRule(entity, rule)
+
+		var wg sync.WaitGroup
+		wg.Add(15)
+		for i := 0; i < 5; i++ {
+			go SemEnter(sem.With(), entity, rule, &wg)
+		}
+
+		for i := 0; i < 5; i++ {
+			go SemAddEnterExit(sem.With(), entity, rule, &wg)
+		}
+
+		for i := 0; i < 5; i++ {
+			go SemExit(sem.With(), entity, rule, &wg)
+		}
+
+		wg.Wait()
+	})
 }
