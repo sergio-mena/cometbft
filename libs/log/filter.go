@@ -15,6 +15,7 @@ type filter struct {
 	allowed          level            // XOR'd levels for default case
 	initiallyAllowed level            // XOR'd levels for initial case
 	allowedKeyvals   map[keyval]level // When key-value match, use this level
+	semActive        bool
 }
 
 type keyval struct {
@@ -30,6 +31,7 @@ func NewFilter(next Logger, options ...Option) Logger {
 	l := &filter{
 		next:           next,
 		allowedKeyvals: make(map[keyval]level),
+		semActive:      false,
 	}
 	for _, option := range options {
 		option(l)
@@ -40,7 +42,7 @@ func NewFilter(next Logger, options ...Option) Logger {
 
 func (l *filter) Info(msg string, keyvals ...interface{}) {
 	levelAllowed := l.allowed&levelInfo != 0
-	if !levelAllowed {
+	if !levelAllowed && !l.semActive {
 		return
 	}
 	l.next.Info(msg, keyvals...)
@@ -48,7 +50,7 @@ func (l *filter) Info(msg string, keyvals ...interface{}) {
 
 func (l *filter) Debug(msg string, keyvals ...interface{}) {
 	levelAllowed := l.allowed&levelDebug != 0
-	if !levelAllowed {
+	if !levelAllowed && !l.semActive {
 		return
 	}
 	l.next.Debug(msg, keyvals...)
@@ -56,10 +58,14 @@ func (l *filter) Debug(msg string, keyvals ...interface{}) {
 
 func (l *filter) Error(msg string, keyvals ...interface{}) {
 	levelAllowed := l.allowed&levelError != 0
-	if !levelAllowed {
+	if !levelAllowed && !l.semActive {
 		return
 	}
 	l.next.Error(msg, keyvals...)
+}
+
+func (l *filter) SetSemStatus(active bool) {
+	l.semActive = active
 }
 
 // With implements Logger by constructing a new filter with a keyvals appended
@@ -97,6 +103,7 @@ func (l *filter) With(keyvals ...interface{}) Logger {
 						next:             l.next.With(keyvals...),
 						allowed:          allowed, // set the desired level
 						allowedKeyvals:   l.allowedKeyvals,
+						semActive:        l.semActive,
 						initiallyAllowed: l.initiallyAllowed,
 					}
 				}
