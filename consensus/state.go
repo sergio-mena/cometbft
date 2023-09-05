@@ -809,20 +809,20 @@ func (cs *State) handleMsg(mi msgInfo) {
 	defer cs.mtx.Unlock()
 	if cs.ProposalBlock != nil {
 		for _, tx := range cs.ProposalBlock.Txs {
-			log.SemEntry(cs.Logger, 1, tx.Hash())
-			defer log.SemExit(cs.Logger, 1, tx.Hash())
+			log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 		}
 	}
 	if cs.LockedBlock != nil {
 		for _, tx := range cs.LockedBlock.Txs {
-			log.SemEntry(cs.Logger, 1, tx.Hash())
-			defer log.SemExit(cs.Logger, 1, tx.Hash())
+			log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 		}
 	}
 	if cs.ValidBlock != nil {
 		for _, tx := range cs.ValidBlock.Txs {
-			log.SemEntry(cs.Logger, 1, tx.Hash())
-			defer log.SemExit(cs.Logger, 1, tx.Hash())
+			log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 		}
 	}
 	var (
@@ -920,20 +920,20 @@ func (cs *State) handleTimeout(ti timeoutInfo, rs cstypes.RoundState) {
 
 	if cs.ProposalBlock != nil {
 		for _, tx := range cs.ProposalBlock.Txs {
-			log.SemEntry(cs.Logger, 1, tx.Hash())
-			defer log.SemExit(cs.Logger, 1, tx.Hash())
+			log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 		}
 	}
 	if cs.LockedBlock != nil {
 		for _, tx := range cs.LockedBlock.Txs {
-			log.SemEntry(cs.Logger, 1, tx.Hash())
-			defer log.SemExit(cs.Logger, 1, tx.Hash())
+			log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 		}
 	}
 	if cs.ValidBlock != nil {
 		for _, tx := range cs.ValidBlock.Txs {
-			log.SemEntry(cs.Logger, 1, tx.Hash())
-			defer log.SemExit(cs.Logger, 1, tx.Hash())
+			log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 		}
 	}
 
@@ -1182,8 +1182,8 @@ func (cs *State) defaultDecideProposal(height int64, round int32) {
 	}
 	// TODO Not needed but leave it as an example of redundant, harmless entry point
 	for _, tx := range block.Txs {
-		log.SemEntry(cs.Logger, 1, tx.Hash())
-		defer log.SemExit(cs.Logger, 1, tx.Hash())
+		log.SemEntry(cs.Logger, log.SemTransaction, tx.Hash())
+		defer log.SemExit(cs.Logger, log.SemTransaction, tx.Hash())
 	}
 
 	// Flush the WAL. Otherwise, we may not recompute the same proposal to sign,

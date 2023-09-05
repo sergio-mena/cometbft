@@ -69,8 +69,8 @@ func BroadcastTxSync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcas
 func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
 	// TODO This won't work, as it will add noise (while blocked)
 	// Solution: make it more fine grained in this function
-	//log.SemEntry(env.Logger, 1, tx.Hash())
-	//defer log.SemExit(env.Logger, 1, tx.Hash())
+	//log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	//defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	subscriber := ctx.RemoteAddr()
 
 	if env.EventBus.NumClients() >= env.Config.MaxSubscriptionClients {
