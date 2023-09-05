@@ -175,8 +175,8 @@ func (memR *Reactor) ReceiveEnvelope(e p2p.Envelope) {
 		for _, tx := range protoTxs {
 			ntx := types.Tx(tx)
 			func() {
-				log.SemEntry(memR.Logger, 1, ntx.Hash())
-				defer log.SemExit(memR.Logger, 1, ntx.Hash())
+				log.SemEntry(memR.Logger, log.SemTransaction, ntx.Hash())
+				defer log.SemExit(memR.Logger, log.SemTransaction, ntx.Hash())
 				err = memR.mempool.CheckTx(ntx, nil, txInfo)
 				if errors.Is(err, mempool.ErrTxInCache) {
 					memR.Logger.Debug("Tx already exists in cache", "tx", ntx.String())

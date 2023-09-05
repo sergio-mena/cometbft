@@ -19,8 +19,8 @@ import (
 // place.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Info/tx
 func Tx(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
-	log.SemEntry(env.Logger, 1, hash)
-	defer log.SemExit(env.Logger, 1, hash)
+	log.SemEntry(env.Logger, log.SemTransaction, hash)
+	defer log.SemExit(env.Logger, log.SemTransaction, hash)
 	// if index is disabled, return error
 	if _, ok := env.TxIndexer.(*null.TxIndex); ok {
 		return nil, fmt.Errorf("transaction indexing is disabled")

@@ -21,8 +21,8 @@ import (
 // CheckTx nor DeliverTx results.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/broadcast_tx_async
 func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
-	log.SemEntry(env.Logger, 1, tx.Hash())
-	defer log.SemExit(env.Logger, 1, tx.Hash())
+	log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	err := env.Mempool.CheckTx(tx, nil, mempl.TxInfo{})
 
 	if err != nil {
@@ -35,8 +35,8 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 // DeliverTx result.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/broadcast_tx_sync
 func BroadcastTxSync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
-	log.SemEntry(env.Logger, 1, tx.Hash())
-	defer log.SemExit(env.Logger, 1, tx.Hash())
+	log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	resCh := make(chan *abci.Response, 1)
 	err := env.Mempool.CheckTx(tx, func(res *abci.Response) {
 		select {
@@ -184,8 +184,8 @@ func NumUnconfirmedTxs(ctx *rpctypes.Context) (*ctypes.ResultUnconfirmedTxs, err
 // be added to the mempool either.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/check_tx
 func CheckTx(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
-	log.SemEntry(env.Logger, 1, tx.Hash())
-	defer log.SemExit(env.Logger, 1, tx.Hash())
+	log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	res, err := env.ProxyAppMempool.CheckTxSync(abci.RequestCheckTx{Tx: tx})
 	if err != nil {
 		return nil, err

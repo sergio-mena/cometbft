@@ -210,8 +210,8 @@ func (bcR *BlockchainReactor) ReceiveEnvelope(e p2p.Envelope) {
 	case *bcproto.BlockResponse:
 		bi, err := types.BlockFromProto(msg.Block)
 		for _, tx := range bi.Txs {
-			log.SemEntry(bcR.Logger, 1, tx.Hash())
-			defer log.SemExit(bcR.Logger, 1, tx.Hash())
+			log.SemEntry(bcR.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(bcR.Logger, log.SemTransaction
 		}
 		if err != nil {
 			bcR.Logger.Error("Block content is invalid", "err", err)
@@ -373,7 +373,7 @@ FOR_LOOP:
 			// first.Hash() doesn't verify the tx contents, so MakePartSet() is
 			// currently necessary.
 			for _, tx := range first.Txs {
-				log.SemEntry(bcR.Logger, 1, tx.Hash())
+				log.SemEntry(bcR.Logger, log.SemTransaction, tx.Hash())
 				// TODO refactor this loop so we can use defer
 			}
 
@@ -404,7 +404,7 @@ FOR_LOOP:
 					bcR.Switch.StopPeerForError(peer2, fmt.Errorf("blockchainReactor validation error: %v", err))
 				}
 				for _, tx := range first.Txs {
-					log.SemExit(bcR.Logger, 1, tx.Hash())
+					log.SemExit(bcR.Logger, log.SemTransaction, tx.Hash())
 				}
 				continue FOR_LOOP
 			}
@@ -432,7 +432,7 @@ FOR_LOOP:
 			}
 
 			for _, tx := range first.Txs {
-				log.SemExit(bcR.Logger, 1, tx.Hash())
+				log.SemExit(bcR.Logger, log.SemTransaction, tx.Hash())
 			}
 			continue FOR_LOOP
 

@@ -589,10 +589,10 @@ func (mem *CListMempool) ReapMaxTxs(max int) types.Txs {
 	txs := make([]types.Tx, 0, cmtmath.MinInt(mem.txs.Len(), max))
 	for e := mem.txs.Front(); e != nil && len(txs) <= max; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
-		log.SemEntry(mem.logger, 1, memTx.tx.Hash())
+		log.SemEntry(mem.logger, log.SemTransaction, memTx.tx.Hash())
 		mem.logger.Debug("reaping transaction in ReapMaxTx", "tx_hash", memTx.tx.Hash())
 		txs = append(txs, memTx.tx)
-		log.SemExit(mem.logger, 1, memTx.tx.Hash())
+		log.SemExit(mem.logger, log.SemTransaction, memTx.tx.Hash())
 	}
 	return txs
 }
@@ -618,8 +618,8 @@ func (mem *CListMempool) Update(
 
 	for i, tx := range txs {
 		func() {
-			log.SemEntry(mem.logger, 1, tx.Hash())
-			defer log.SemExit(mem.logger, 1, tx.Hash())
+			log.SemEntry(mem.logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(mem.logger, log.SemTransaction, tx.Hash())
 
 			if deliverTxResponses[i].Code == abci.CodeTypeOK {
 				// Add valid committed tx to the cache (if missing).
@@ -681,8 +681,8 @@ func (mem *CListMempool) recheckTxs() {
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
 		func() {
-			log.SemEntry(mem.logger, 1, memTx.tx.Hash())
-			defer log.SemExit(mem.logger, 1, memTx.tx.Hash())
+			log.SemEntry(mem.logger, log.SemTransaction, memTx.tx.Hash())
+			defer log.SemExit(mem.logger, log.SemTransaction, memTx.tx.Hash())
 			mem.logger.Debug("running re-CheckTx on transaction", "tx_hash", memTx.tx.Hash())
 			mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{
 				Tx:   memTx.tx,
