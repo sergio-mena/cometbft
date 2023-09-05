@@ -211,7 +211,7 @@ func (bcR *BlockchainReactor) ReceiveEnvelope(e p2p.Envelope) {
 		bi, err := types.BlockFromProto(msg.Block)
 		for _, tx := range bi.Txs {
 			log.SemEntry(bcR.Logger, log.SemTransaction, tx.Hash())
-			defer log.SemExit(bcR.Logger, log.SemTransaction
+			defer log.SemExit(bcR.Logger, log.SemTransaction, tx.Hash())
 		}
 		if err != nil {
 			bcR.Logger.Error("Block content is invalid", "err", err)
