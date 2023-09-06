@@ -209,6 +209,7 @@ func (mem *CListMempool) CheckTx(
 	mem.updateMtx.RLock()
 	// use defer to unlock mutex because application (*local client*) might panic
 	defer mem.updateMtx.RUnlock()
+	mem.logger.Debug("running CheckTx", "tx_hash", tx.Hash())
 
 	txSize := len(tx)
 
@@ -236,7 +237,9 @@ func (mem *CListMempool) CheckTx(
 		return err
 	}
 
+	mem.logger.Debug("trying to add tx to cache", "tx_hash", tx.Hash())
 	if !mem.cache.Push(tx) { // if the transaction already exists in the cache
+		mem.logger.Debug("tx to add is already in cache", "tx_hash", tx.Hash())
 		// Record a new sender for a tx we've already seen.
 		// Note it's possible a tx is still in the cache but no longer in the mempool
 		// (eg. after committing a block, txs are removed from mempool but not cache),
@@ -330,6 +333,7 @@ func (mem *CListMempool) removeTx(tx types.Tx, elem *clist.CElement, removeFromC
 	atomic.AddInt64(&mem.txsBytes, int64(-len(tx)))
 
 	if removeFromCache {
+		mem.logger.Debug("remove tx from cache", "tx_hash", tx.Hash())
 		mem.cache.Remove(tx)
 	}
 }
@@ -386,6 +390,7 @@ func (mem *CListMempool) resCbFirstTime(
 			// limits.
 			if err := mem.isFull(len(tx)); err != nil {
 				// remove from cache (mempool might have a space later)
+				mem.logger.Debug("tx doesn't fit in mempool, removing from cache", "tx", tx)
 				mem.cache.Remove(tx)
 				mem.logger.Error(err.Error())
 				return
@@ -584,7 +589,10 @@ func (mem *CListMempool) ReapMaxTxs(max int) types.Txs {
 	txs := make([]types.Tx, 0, cmtmath.MinInt(mem.txs.Len(), max))
 	for e := mem.txs.Front(); e != nil && len(txs) <= max; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
+		log.SemEntry(mem.logger, log.SemTransaction, memTx.tx.Hash())
+		mem.logger.Debug("reaping transaction in ReapMaxTx", "tx_hash", memTx.tx.Hash())
 		txs = append(txs, memTx.tx)
+		log.SemExit(mem.logger, log.SemTransaction, memTx.tx.Hash())
 	}
 	return txs
 }
@@ -609,27 +617,35 @@ func (mem *CListMempool) Update(
 	}
 
 	for i, tx := range txs {
-		if deliverTxResponses[i].Code == abci.CodeTypeOK {
-			// Add valid committed tx to the cache (if missing).
-			_ = mem.cache.Push(tx)
-		} else if !mem.config.KeepInvalidTxsInCache {
-			// Allow invalid transactions to be resubmitted.
-			mem.cache.Remove(tx)
-		}
+		func() {
+			log.SemEntry(mem.logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(mem.logger, log.SemTransaction, tx.Hash())
 
-		// Remove committed tx from the mempool.
-		//
-		// Note an evil proposer can drop valid txs!
-		// Mempool before:
-		//   100 -> 101 -> 102
-		// Block, proposed by an evil proposer:
-		//   101 -> 102
-		// Mempool after:
-		//   100
-		// https://github.com/tendermint/tendermint/issues/3322.
-		if e, ok := mem.txsMap.Load(tx.Key()); ok {
-			mem.removeTx(tx, e.(*clist.CElement), false)
-		}
+			if deliverTxResponses[i].Code == abci.CodeTypeOK {
+				// Add valid committed tx to the cache (if missing).
+				mem.logger.Debug("adding tx to cache", "tx_hash", tx.Hash())
+				_ = mem.cache.Push(tx)
+			} else if !mem.config.KeepInvalidTxsInCache {
+				// Allow invalid transactions to be resubmitted.
+				mem.logger.Debug("removing tx from cache", "tx_hash", tx.Hash())
+				mem.cache.Remove(tx)
+			}
+
+			// Remove committed tx from the mempool.
+			//
+			// Note an evil proposer can drop valid txs!
+			// Mempool before:
+			//   100 -> 101 -> 102
+			// Block, proposed by an evil proposer:
+			//   101 -> 102
+			// Mempool after:
+			//   100
+			// https://github.com/tendermint/tendermint/issues/3322.
+			mem.logger.Debug("trying to remove tx from mempool", "tx_hash", tx.Hash())
+			if e, ok := mem.txsMap.Load(tx.Key()); ok {
+				mem.removeTx(tx, e.(*clist.CElement), false)
+			}
+		}()
 	}
 
 	// Either recheck non-committed txs to see if they became invalid
@@ -664,10 +680,15 @@ func (mem *CListMempool) recheckTxs() {
 	// NOTE: globalCb may be called concurrently.
 	for e := mem.txs.Front(); e != nil; e = e.Next() {
 		memTx := e.Value.(*mempoolTx)
-		mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{
-			Tx:   memTx.tx,
-			Type: abci.CheckTxType_Recheck,
-		})
+		func() {
+			log.SemEntry(mem.logger, log.SemTransaction, memTx.tx.Hash())
+			defer log.SemExit(mem.logger, log.SemTransaction, memTx.tx.Hash())
+			mem.logger.Debug("running re-CheckTx on transaction", "tx_hash", memTx.tx.Hash())
+			mem.proxyAppConn.CheckTxAsync(abci.RequestCheckTx{
+				Tx:   memTx.tx,
+				Type: abci.CheckTxType_Recheck,
+			})
+		}()
 	}
 
 	mem.proxyAppConn.FlushAsync()

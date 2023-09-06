@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/tendermint/tendermint/libs/log"
 	cmtmath "github.com/tendermint/tendermint/libs/math"
 	cmtquery "github.com/tendermint/tendermint/libs/pubsub/query"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
@@ -18,10 +19,13 @@ import (
 // place.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Info/tx
 func Tx(ctx *rpctypes.Context, hash []byte, prove bool) (*ctypes.ResultTx, error) {
+	log.SemEntry(env.Logger, log.SemTransaction, hash)
+	defer log.SemExit(env.Logger, log.SemTransaction, hash)
 	// if index is disabled, return error
 	if _, ok := env.TxIndexer.(*null.TxIndex); ok {
 		return nil, fmt.Errorf("transaction indexing is disabled")
 	}
+	env.Logger.Debug("RPC 'tx' method called", "tx_hash", hash)
 
 	r, err := env.TxIndexer.Get(hash)
 	if err != nil {

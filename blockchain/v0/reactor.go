@@ -209,10 +209,19 @@ func (bcR *BlockchainReactor) ReceiveEnvelope(e p2p.Envelope) {
 		bcR.respondToPeer(msg, e.Src)
 	case *bcproto.BlockResponse:
 		bi, err := types.BlockFromProto(msg.Block)
+		for _, tx := range bi.Txs {
+			log.SemEntry(bcR.Logger, log.SemTransaction, tx.Hash())
+			defer log.SemExit(bcR.Logger, log.SemTransaction, tx.Hash())
+		}
 		if err != nil {
 			bcR.Logger.Error("Block content is invalid", "err", err)
 			return
 		}
+		bcR.Logger.Debug("adding block to blocksync pool",
+			"peerID", e.Src.ID(),
+			"height", bi.Height,
+			"size", msg.Block.Size(),
+		)
 		bcR.pool.AddBlock(e.Src.ID(), bi, msg.Block.Size())
 	case *bcproto.StatusRequest:
 		// Send peer our state.
@@ -363,11 +372,18 @@ FOR_LOOP:
 			// NOTE: we can probably make this more efficient, but note that calling
 			// first.Hash() doesn't verify the tx contents, so MakePartSet() is
 			// currently necessary.
+			for _, tx := range first.Txs {
+				log.SemEntry(bcR.Logger, log.SemTransaction, tx.Hash())
+				// TODO refactor this loop so we can use defer
+			}
+
+			bcR.Logger.Debug("verifying block", "height", first.Height)
 			err := state.Validators.VerifyCommitLight(
 				chainID, firstID, first.Height, second.LastCommit)
 
 			if err == nil {
 				// validate the block before we persist it
+				bcR.Logger.Debug("validating block", "height", first.Height)
 				err = bcR.blockExec.ValidateBlock(state, first)
 			}
 
@@ -387,12 +403,16 @@ FOR_LOOP:
 					// still need to clean up the rest.
 					bcR.Switch.StopPeerForError(peer2, fmt.Errorf("blockchainReactor validation error: %v", err))
 				}
+				for _, tx := range first.Txs {
+					log.SemExit(bcR.Logger, log.SemTransaction, tx.Hash())
+				}
 				continue FOR_LOOP
 			}
 
 			bcR.pool.PopRequest()
 
 			// TODO: batch saves so we dont persist to disk every block
+			bcR.Logger.Debug("saving block", "height", first.Height)
 			bcR.store.SaveBlock(first, firstParts, second.LastCommit)
 
 			// TODO: same thing for app - but we would need a way to
@@ -411,6 +431,9 @@ FOR_LOOP:
 				lastHundred = time.Now()
 			}
 
+			for _, tx := range first.Txs {
+				log.SemExit(bcR.Logger, log.SemTransaction, tx.Hash())
+			}
 			continue FOR_LOOP
 
 		case <-bcR.Quit():

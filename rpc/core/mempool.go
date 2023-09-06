@@ -7,6 +7,7 @@ import (
 	"time"
 
 	abci "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/libs/log"
 	mempl "github.com/tendermint/tendermint/mempool"
 	ctypes "github.com/tendermint/tendermint/rpc/core/types"
 	rpctypes "github.com/tendermint/tendermint/rpc/jsonrpc/types"
@@ -20,6 +21,8 @@ import (
 // CheckTx nor DeliverTx results.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/broadcast_tx_async
 func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
+	log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	err := env.Mempool.CheckTx(tx, nil, mempl.TxInfo{})
 
 	if err != nil {
@@ -32,6 +35,8 @@ func BroadcastTxAsync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadca
 // DeliverTx result.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/broadcast_tx_sync
 func BroadcastTxSync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTx, error) {
+	log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	resCh := make(chan *abci.Response, 1)
 	err := env.Mempool.CheckTx(tx, func(res *abci.Response) {
 		select {
@@ -62,6 +67,10 @@ func BroadcastTxSync(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcas
 // BroadcastTxCommit returns with the responses from CheckTx and DeliverTx.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/broadcast_tx_commit
 func BroadcastTxCommit(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultBroadcastTxCommit, error) {
+	// TODO This won't work, as it will add noise (while blocked)
+	// Solution: make it more fine grained in this function
+	//log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	//defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	subscriber := ctx.RemoteAddr()
 
 	if env.EventBus.NumClients() >= env.Config.MaxSubscriptionClients {
@@ -175,6 +184,8 @@ func NumUnconfirmedTxs(ctx *rpctypes.Context) (*ctypes.ResultUnconfirmedTxs, err
 // be added to the mempool either.
 // More: https://docs.cometbft.com/v0.34/rpc/#/Tx/check_tx
 func CheckTx(ctx *rpctypes.Context, tx types.Tx) (*ctypes.ResultCheckTx, error) {
+	log.SemEntry(env.Logger, log.SemTransaction, tx.Hash())
+	defer log.SemExit(env.Logger, log.SemTransaction, tx.Hash())
 	res, err := env.ProxyAppMempool.CheckTxSync(abci.RequestCheckTx{Tx: tx})
 	if err != nil {
 		return nil, err
